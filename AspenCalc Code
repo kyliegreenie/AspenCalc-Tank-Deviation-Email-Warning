@@ -1,0 +1,139 @@
+Level_1_NowAvg = (TagAverage(Level_1, Now()-0:06, Now(),  0, 0))
+Level_2_NowAvg = (TagAverage(Level_2, Now()-0:06, Now(), 0, 0))
+
+'-----sensor selection process-------
+
+
+'are the sensors giving different values?
+
+Level_difference = abs(Level_1_NowAvg - Level_2_NowAvg)
+if(Level_difference > 5) then
+unknown_faulty_sensor = 1
+else
+unknown_faulty_sensor = 0
+endif
+
+'does one sensor have to much noise?
+
+TagStatistics(Level_1, Now()-0:06, Now(), 0, 0, a, b, c, d, e, f, std1, h)
+TagStatistics(Level_2, Now()-0:06, Now(), 0, 0, a1, b1, c1, d1, e1, f1, std2, h1)
+
+if(std1 > (0.12 * Max_Fill_Rate)) then
+std_potential_sensor_1_faulty = 10
+else
+std_potential_sensor_1_faulty = 0
+endif
+
+if(std2 > (0.12 * Max_Fill_Rate)) then
+std_potential_sensor_2_faulty = 10
+else
+std_potential_sensor_2_faulty = 0
+endif
+
+if((std_potential_sensor_2_faulty > 1) and (std_potential_sensor_1_faulty > 1) and (std2 > std1)) then
+std_potential_sensor_1_faulty = 0
+endif
+
+if((std_potential_sensor_2_faulty > 1) and (std_potential_sensor_1_faulty > 1) and (std1 > std2)) then
+std_potential_sensor_2_faulty = 0
+endif
+
+'if the sensors are giving different values, are the values in a realistic range?
+
+if((unknown_faulty_sensor = 1) and ((Level_1_NowAvg > 98) or (Level_1_NowAvg < 3))) then
+potential_sensor_1_faulty = 15
+elseif((unknown_faulty_sensor = 1) and ((Level_2_NowAvg > 98) or (Level_2_NowAvg < 3))) then
+potential_sensor_2_faulty = 14
+endif
+
+'Is one sensor stuck at a nonzero value
+if(( std1 > (0.05 * Max_Fill_Rate)) and (std2 < (0.05 * Max_Fill_Rate)) and (unknown_faulty_sensor = 1)) then
+potential_sensor_2_faulty = 13
+endif
+if(( std2 > (0.05 * Max_Fill_Rate)) and (std1 < (0.05 * Max_Fill_Rate)) and (unknown_faulty_sensor = 1)) then
+potential_sensor_1_faulty = 12
+endif
+'this will cause faulty sensor to trigger when there is not fill, but it wont mattter bc we only care if about faulty sensor when fill rate is nearing max fill rate
+
+
+'if the sensors are giving different values, does one sensor give too low of a fill rate?
+'2nd method to test stuck sensor
+
+if((unknown_faulty_sensor = 1) and ((abs(Level_1_NowAvg- (TagAverage(Level_1,  Now()-1:06, Now()-1:00,  0, 0)))) < (0.1 * Max_Fill_Rate)) and (abs(Level_2_NowAvg- (TagAverage(Level_2,  Now()-1:06, Now()-1:00,  0, 0))) > (0.1 * Max_Fill_Rate))) then
+potential_sensor_1_faulty = 11
+endif
+
+if((unknown_faulty_sensor = 1) and ((abs(Level_2_NowAvg- (TagAverage(Level_2,  Now()-1:06, Now()-1:00,  0, 0)))) < (0.1 * Max_Fill_Rate)) and (abs(Level_1_NowAvg- (TagAverage(Level_1,  Now()-1:06, Now()-1:00,  0, 0))) > (0.1 * Max_Fill_Rate))) then
+potential_sensor_2_faulty = 10
+endif
+
+'do we only have one potential faulty sensor
+
+
+if((potential_sensor_1_faulty > 0) and (potential_sensor_2_faulty = 0)) then
+use_sensor_2 = 10
+endif
+if((potential_sensor_2_faulty > 0) and (potential_sensor_1_faulty = 0)) then
+use_sensor_1 = 10
+endif
+if((std_potential_sensor_1_faulty > 0) and (potential_sensor_2_faulty = 0)) then
+use_sensor_2 = 11
+endif
+if((std_potential_sensor_2_faulty > 0) and (potential_sensor_1_faulty = 0)) then
+use_sensor_1 = 11
+endif
+if((potential_sensor_1_faulty = 0) and (potential_sensor_2_faulty = 0) and (std_potential_sensor_1_faulty = 0) and (std_potential_sensor_2_faulty = 0)) then
+use_sensor_1 = 12
+endif
+if ((potential_sensor_2_faulty > 0) and (potential_sensor_1_faulty > 0)) then
+use_sensor_1 = 13
+endif
+
+'what if only one sensor is in
+
+if(Level_1 = 0) then
+use_sensor_1 = 0
+endif
+
+
+if(Level_1 = 0) then
+use_sensor_2 = 16
+endif
+
+
+if(Level_2 = 0) then
+use_sensor_1 = 17
+endif
+
+
+if(Level_2 = 0) then
+use_sensor_2 = 0
+endif
+
+
+if((use_sensor_1 > 0) and (use_sensor_2 > 0)) then
+use_sensor_2 = 0
+endif
+if((use_sensor_1 = 0) and (use_sensor_2 = 0)) then
+use_sensor_1 = 18
+endif
+
+'Warning 1 hour
+
+if(use_sensor_1 > 1) then
+if ((TagAverage(Level_1, Now()-0:06, Now(), 0, 0) -TagAverage(Level_1, Now()-1:06, Now()-1:00, 0, 0))  >=  Max_Fill_Rate) then
+Tank_Fill_Rate_Warning_60m = 1
+else
+Tank_Fill_Rate_Warning_60m = 0
+
+endif
+endif
+
+if(use_sensor_2 > 1) then
+if ((TagAverage(Level_2, Now()-0:06, Now(), 0, 0) -TagAverage(Level_2, Now()-1:06, Now()-1:00, 0, 0))  >=  Max_Fill_Rate) then
+Tank_Fill_Rate_Warning_60m = 1
+else
+Tank_Fill_Rate_Warning_60m = 0
+
+endif
+endif
